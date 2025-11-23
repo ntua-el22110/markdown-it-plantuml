@@ -28,6 +28,11 @@ module.exports = function umlPlugin(md, options) {
       closeChar = closeMarker.charCodeAt(0),
       render = options.render || md.renderer.rules.image,
       generateSource = options.generateSource || generateSourceDefault;
+  
+  var openMarkers = [
+    openMarker,
+    "```plantuml\n@startsalt" // Hardcode the salt marker too
+  ];
 
   function uml(state, startLine, endLine, silent) {
     var nextLine, markup, params, token, i,
@@ -35,15 +40,34 @@ module.exports = function umlPlugin(md, options) {
         start = state.bMarks[startLine] + state.tShift[startLine],
         max = state.eMarks[startLine];
 
-    // Check out the first character quickly,
-    // this should filter out most of non-uml blocks
-    //
-    if (openChar !== state.src.charCodeAt(start)) { return false; }
+    var foundMarker = null;
 
-    // Check out the rest of the marker string
-    //
-    for (i = 0; i < openMarker.length; ++i) {
-      if (openMarker[i] !== state.src[start + i]) { return false; }
+    for (var c = 0; c < openMarkers.length && foundMarker === null; ++c) {
+      var marker = openMarkers[c];
+
+      // Quick first-char filter
+      if (marker.charCodeAt(0) !== state.src.charCodeAt(start)) {
+        continue;
+      }
+
+      // ensure we don't read past the end of the source
+      if (start + marker.length > state.src.length) { continue; }
+
+      // compare whole marker
+      var match = true;
+      for (i = 0; i < marker.length; ++i) {
+        if (marker[i] !== state.src[start + i]) {
+          match = false; break;
+        }
+      }
+
+      if (match) {
+        foundMarker = marker;
+      }
+    }
+
+    if (foundMarker === null) {
+      return false;
     }
 
     markup = state.src.slice(start, start + i);
